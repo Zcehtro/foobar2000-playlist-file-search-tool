@@ -102,3 +102,9 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 ## Contributing
 
 Contributions are welcome! Feel free to submit issues or pull requests to improve the script.
+
+## Thanks
+
+- Foobar2000 developers (Peter Pawłowski and the rest of the community) for an unparralleled music playing experience.
+- <https://patorjk.com/> for the ASCII art generator used in the script.
+- PowerShell community for an invaluable scripting environment.
