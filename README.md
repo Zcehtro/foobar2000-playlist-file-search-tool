@@ -84,6 +84,7 @@ copy.json.example -> config.json
   - The script will replace file paths in playlists based on the mapping between the source and replacement playlists.
   - Both playlists should contain the same files for the replacement to work correctly.
   - A new subfolder named `_new-playlists` will be created within the `ListsDir` directory, containing only the playlists where replacements were successfully processed.
+  - Also performs search from Search Mode.
 
 ### Logs
 

@@ -73,7 +73,7 @@ Write-Host "Enter mode: 'Search' or 'Replace'
 
 - Search mode will search for files in the source list and report their locations in all the other 
 playlists in the current folder.
-- Replace mode will replace the files in the source list with the files in the replacement list.
+- Replace mode will perform the same Search, but will also replace the found files in the source list with the files from the replacement list.
 
 Note: The source and replacement lists must have the same number of lines.
 1. Search
