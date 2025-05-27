@@ -6,8 +6,14 @@ This PowerShell script is designed to help manage and process Foobar2000 `.m3u8`
 
 - **Search Mode**: Search for files in a source playlist and report their locations in other playlists.
 - **Replace Mode**: Replace file paths in playlists based on a source and replacement playlist.
+
+## Enhancements and optimizations
+
 - **Unwanted Playlists Filtering**: Automatically exclude unwanted playlists from processing.
 - **Environment Variable Support**: Use environment variables in the configuration file for dynamic paths.
+- **Reverse Content Indexing**: The script builds a reverse index of playlist content for faster lookups, significantly optimizing search operations.
+- **Progress Indicators**: Progress bars are displayed during indexing and search operations, providing real-time feedback to the user.
+- **Error Handling**: The script includes robust error handling, such as verifying file selections and ensuring source and replacement playlists have matching line counts.
 
 ## Requirements
 
@@ -77,6 +83,7 @@ copy.json.example -> config.json
   - Select a source playlist and a replacement playlist.
   - The script will replace file paths in playlists based on the mapping between the source and replacement playlists.
   - Both playlists should contain the same files for the replacement to work correctly.
+  - A new subfolder named `_new-playlists` will be created within the `ListsDir` directory, containing only the playlists where replacements were successfully processed.
 
 ### Logs
 
