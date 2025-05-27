@@ -191,6 +191,14 @@ if ($SourceListNumber -eq -1) {
 $results = @()
 
 # Search using the reverse content index
+# Build a mapping from source line to its index for quick lookup in replace mode
+if ($mode -eq 'replace') {
+    $sourceLineToIndex = @{}
+    for ($j = 0; $j -lt $sourceLines.Count; $j++) {
+        $sourceLineToIndex[$sourceLines[$j]] = $j
+    }
+}
+
 for ($i = 0; $i -lt $sourceLines.Count; $i++) {
     $line = $sourceLines[$i]
     if ($contentIndex.ContainsKey($line)) {
@@ -211,10 +219,12 @@ for ($i = 0; $i -lt $sourceLines.Count; $i++) {
                     $playlist = $listsData | Where-Object { $_.Name -eq $match }
                     if ($playlist) {
                         $newPlaylistPath = Join-Path $newPlaylistsDir $playlist.Name
+                        $playlistLines = Get-Content -Encoding UTF8 -LiteralPath $playlist.Path
                         $newContent = @()
-                        foreach ($playlistLine in $playlist.Content) {
-                            if ($playlistLine -eq $line) {
-                                $newContent += $replacementLines[$i]
+                        foreach ($playlistLine in $playlistLines) {
+                            if ($sourceLineToIndex.ContainsKey($playlistLine)) {
+                                $replaceIdx = $sourceLineToIndex[$playlistLine]
+                                $newContent += $replacementLines[$replaceIdx]
                             }
                             else {
                                 $newContent += $playlistLine
