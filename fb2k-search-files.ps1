@@ -86,11 +86,11 @@ if ($mode -notin @('1', '2')) {
 
 # Set mode value explicitly for search and replace
 if ($mode -eq '2') {
-    Write-Host "Replace mode selected."
+    Write-Host "`nReplace mode selected.`n"
     $mode = 'replace'
 }
 else {
-    Write-Host "Search mode selected."
+    Write-Host "`nSearch mode selected.`n"
     $mode = 'search'
 }
 
