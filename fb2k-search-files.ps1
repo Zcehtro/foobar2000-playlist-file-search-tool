@@ -31,9 +31,6 @@ foreach ($key in $config.PSObject.Properties.Name) {
     }
 }
 
-# Debugging: Output the processed configuration
-Write-Host "Processed configuration: $($config | ConvertTo-Json -Depth 10)"
-
 # Access configuration variables
 $ListsDir = $config.ListsDir
 $ListsExt = $config.ListsExt
@@ -46,8 +43,11 @@ Remove-Item -LiteralPath $logReportLoc, $logMissingLoc -ErrorAction SilentlyCont
 
 # Prompt user for mode
 Write-Host "Enter mode: 'Search' or 'Replace'
-Search mode will search for files in the source list and report their locations in all the other playlists in the current folder.
-Replace mode will replace the files in the source list with the files in the replacement list.
+
+- Search mode will search for files in the source list and report their locations in all the other 
+playlists in the current folder.
+- Replace mode will replace the files in the source list with the files in the replacement list.
+
 Note: The source and replacement lists must have the same number of lines.
 1. Search
 2. Replace"
@@ -61,7 +61,8 @@ if ($mode -notin @('1', '2')) {
 if ($mode -eq '2') {
     Write-Host "Replace mode selected."
     $mode = 'replace'
-} else {
+}
+else {
     Write-Host "Search mode selected."
     $mode = 'search'
 }
