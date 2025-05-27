@@ -47,11 +47,11 @@ The script uses a JSON configuration file (`config.json`) to define directories,
 
 ### Configuration Fields
 
-- **`ListsDir`**: The directory containing the `.m3u8` playlists to process. In foobar2000 you can export your playlists to a specific directory. A batch operation can be performed with the right click menu.
+- **`ListsDir`**: The directory containing the playlists to process. In foobar2000 you can export your playlists to a specific directory. A batch operation can be performed with the right click menu.
 - **`ListsExt`**: The file extension of the playlists (default: `m3u8`).
 - **`LogReportLoc`**: Path to the report file for search results.
 - **`LogMissingLoc`**: Path to the log file for missing files.
-- **`UnwantedLists`**: A list of playlist filenames to exclude from processing.
+- **`UnwantedLists`**: A list of playlist filenames to exclude from processing. **Do not include the search and replace playlists in this list.**
 
 ### Example Configuration Template
 
@@ -63,15 +63,18 @@ copy.json.example -> config.json
 
 ## Usage
 
-1. Open a PowerShell terminal.
-2. Navigate to the directory containing the script.
-3. Run the script:
+1. Set up a folder with your Foobar2000 playlists.
+2. Configure the `config.json` file with the appropriate paths and settings. Refer to [#Configuration Fields](#configuration-fields) above.
+3. Open a PowerShell terminal.
+4. Navigate to the directory containing this script.
+5. Run the script:
 
    ```powershell
    .\fb2k-search-files.ps1
    ```
 
-4. Follow the prompts to select a mode (`Search` or `Replace`) and provide the required playlists.
+6. Follow the prompts to select a mode (`Search` or `Replace`).
+7. When done, the log file will automatically open in your default text editor, displaying the results of the search operation. If replace mode was used, a new subfolder `_new-playlists` will be created in the `ListsDir` directory containing the updated playlists.
 
 ### Modes
 
