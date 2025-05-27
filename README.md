@@ -51,7 +51,7 @@ The script uses a JSON configuration file (`config.json`) to define directories,
 - **`ListsExt`**: The file extension of the playlists (default: `m3u8`).
 - **`LogReportLoc`**: Path to the report file for search results.
 - **`LogMissingLoc`**: Path to the log file for missing files.
-- **`UnwantedLists`**: A list of playlist filenames to exclude from processing. **Do not include the search and replace playlists in this list.**
+- **`UnwantedLists`**: A list of playlist filenames to exclude from processing.
 
 ### Example Configuration Template
 
@@ -98,6 +98,7 @@ copy.json.example -> config.json
 
 - Ensure that the `config.json` file is properly configured before running the script.
 - The script will automatically exclude playlists listed in the `UnwantedLists` field of the configuration.
+- Do not add the search and replace playlists to the `UnwantedLists` field, as this will cause the script to not find them.
 
 ## License
 
