@@ -1,0 +1,11 @@
+{
+    "ListsDir": "C:\\TEMP\\Comparing Lists",
+    "ListsExt": "m3u8",
+    "LogReportLoc": "$env:TEMP\\fb2k-search-files-report.txt",
+    "LogMissingLoc": "$env:TEMP\\fb2k-search-files-missing.txt",
+    "UnwantedLists": [
+        "My first playlist.m3u8",
+        "My second playlist.m3u8",
+        "Don't forget to remove the .example from the extension in this file.m3u8"
+    ]
+}
