@@ -1,6 +1,7 @@
-# Foobar Playlist File Search - PowerShell Version
+# Foobar Playlist File Search & Replace Tool - Refactored PowerShell Script
 
-Write-Host "
+# region: ASCII Banner
+Write-Host @"
 ___________          ___.                _______________  _______  _______    
 \_   _____/___   ____\_ |__ _____ _______\_____  \   _  \ \   _  \ \   _  \   
  |    __)/  _ \ /  _ \| __ \\__  \\_  __ \/  ____/  /_\  \/  /_\  \/  /_\  \  
@@ -24,236 +25,190 @@ ___________           .__
   |    | /  _ \ /  _ \|  |                                                    
   |    |(  <_> |  <_> )  |__                                                  
   |____| \____/ \____/|____/                                                  
-                                                                              
-"
 
-# Function to replace environment variables in strings using PowerShell $env: template
+"@
+# endregion
+
+# region: Function Definitions
+
 function Replace-Variables {
-    param (
-        [string]$inputString
-    )
+    param ([string]$inputString)
     $pattern = '\$env:([a-zA-Z_][a-zA-Z0-9_]*)'
     return [regex]::Replace($inputString, $pattern, {
-            param($match)
-            $envVarName = $match.Groups[1].Value
-            $envValue = [System.Environment]::GetEnvironmentVariable($envVarName)
-            if ($envValue) {
-                return $envValue
-            }
-            else {
-                return $match.Value
-            }
-        })
+        param($match)
+        $envVarName = $match.Groups[1].Value
+        return [System.Environment]::GetEnvironmentVariable($envVarName) ?? $match.Value
+    })
 }
 
+function Prompt-FileDialog {
+    param (
+        [string]$title,
+        [string]$initialDir
+    )
+    Add-Type -AssemblyName System.Windows.Forms
+    $dialog = New-Object System.Windows.Forms.OpenFileDialog
+    $dialog.InitialDirectory = $initialDir
+    $dialog.Filter = "M3U Unicode playlist (*.m3u8)|*.m3u8"
+    $dialog.Title = $title
+    $dialog.ShowDialog() | Out-Null
+    return $dialog.FileName
+}
 
-# Load configuration from JSON file
-$configPath = ".\config.json"
-$config = Get-Content -Path $configPath | ConvertFrom-Json
+function Read-PlaylistLines {
+    param ([string]$path)
+    return Get-Content -Encoding UTF8 -LiteralPath $path -ReadCount 0
+}
 
-# Preprocess environment variables in the configuration
+function Create-NewPlaylistsDir {
+    param ([string]$basePath)
+    $newDir = Join-Path $basePath "_new-playlists"
+    if (-not (Test-Path $newDir)) {
+        New-Item -ItemType Directory -Path $newDir | Out-Null
+    }
+    return $newDir
+}
+
+function Show-ErrorDialog {
+    param ([string]$message)
+    [System.Windows.Forms.MessageBox]::Show($message, "Error", 'OK', 'Error') | Out-Null
+}
+
+# endregion
+
+# region: Load Config & Setup
+$config = Get-Content -Path "./config.json" | ConvertFrom-Json
 foreach ($key in $config.PSObject.Properties.Name) {
     if ($config.$key -is [string]) {
         $config.$key = Replace-Variables -inputString $config.$key
     }
 }
 
-# Access configuration variables
 $ListsDir = $config.ListsDir
 $ListsExt = $config.ListsExt
 $logReportLoc = $config.LogReportLoc
 $logMissingLoc = $config.LogMissingLoc
-$unwantedLists = $config.UnwantedLists
-
-# Helper: Clear logs
-Remove-Item -LiteralPath $logReportLoc, $logMissingLoc -ErrorAction SilentlyContinue
-
-# Prompt user for mode
-Write-Host "Enter mode: 'Search' or 'Replace'
-
-- Search mode will search for files in the source list and report their locations in all the other 
-playlists in the current folder.
-- Replace mode will perform the same Search, but will also replace the found files in the source list with the files from the replacement list.
-
-Note: The source and replacement lists must have the same number of lines.
-1. Search
-2. Replace"
-$mode = Read-Host 
-if ($mode -notin @('1', '2')) {
-    Write-Error "Invalid mode selected. Exiting."
-    exit
-}
-
-# Set mode value explicitly for search and replace
-if ($mode -eq '2') {
-    Write-Host "`nReplace mode selected.`n"
-    $mode = 'replace'
-}
-else {
-    Write-Host "`nSearch mode selected.`n"
-    $mode = 'search'
-}
-
-# Build a set of unwanted lists for quick lookup
 $unwantedSet = [System.Collections.Generic.HashSet[string]]::new()
-foreach ($file in $unwantedLists) {
-    $unwantedSet.Add($file) | Out-Null
-}
+$config.UnwantedLists | ForEach-Object { $unwantedSet.Add($_) | Out-Null }
 
-# Prompt user to select a source list
-Add-Type -AssemblyName System.Windows.Forms
-$OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
-$OpenFileDialog.InitialDirectory = $ListsDir
-$OpenFileDialog.Filter = "M3U Unicode playlist (*.m3u8)|*.m3u8"
-$OpenFileDialog.Title = "Select source list containing files to search for"
-$OpenFileDialog.ShowDialog() | Out-Null
-$SourceListLoc = $OpenFileDialog.FileName
+Remove-Item -LiteralPath $logReportLoc, $logMissingLoc -ErrorAction SilentlyContinue
+# endregion
 
-# Verify if the selected source list is in the unwanted lists
-if ($unwantedSet.Contains((Get-Item -LiteralPath $SourceListLoc).Name)) {
-    [System.Windows.Forms.MessageBox]::Show("The selected source list is in the unwanted lists. Exiting.", "Error", 'OK', 'Error')
+# region: Prompt for Mode
+Write-Host "Enter mode: 'Search' or 'Replace'"
+Write-Host "1. Search`n2. Replace`n"
+$mode = Read-Host
+if ($mode -notin @('1', '2')) { Write-Error "Invalid mode."; exit }
+Write-Host `n
+$mode = if ($mode -eq '2') { 'replace' } else { 'search' }
+
+# endregion
+
+# region: File Selection
+$SourceListLoc = Prompt-FileDialog -title "Select source list" -initialDir $ListsDir
+if (-not $SourceListLoc -or $unwantedSet.Contains((Get-Item $SourceListLoc).Name)) {
+    Show-ErrorDialog "Invalid or unwanted source list selected."
     exit
 }
+$sourceLines = Read-PlaylistLines -path $SourceListLoc
 
-if (-not $SourceListLoc) {
-    [System.Windows.Forms.MessageBox]::Show("No file selected.", "Error", 'OK', 'Error')
-    exit
-}
-
-# Parse lines in source list
-$sourceLines = Get-Content -Encoding UTF8 -LiteralPath $SourceListLoc -ReadCount 0
-
-# If in replace mode, prompt for replacement list
 if ($mode -eq 'replace') {
-    $OpenFileDialog.Title = "Select replacement list containing replacement file paths"
-    $OpenFileDialog.ShowDialog() | Out-Null
-    $ReplacementListLoc = $OpenFileDialog.FileName
-
-    # Verify if the selected replacement list is in the unwanted lists
-    if ($unwantedSet.Contains((Get-Item -LiteralPath $ReplacementListLoc).Name)) {
-        [System.Windows.Forms.MessageBox]::Show("The selected replacement list is in the unwanted lists. Exiting.", "Error", 'OK', 'Error')
+    $ReplacementListLoc = Prompt-FileDialog -title "Select replacement list" -initialDir $ListsDir
+    if (-not $ReplacementListLoc -or $unwantedSet.Contains((Get-Item $ReplacementListLoc).Name)) {
+        Show-ErrorDialog "Invalid or unwanted replacement list selected."
         exit
     }
-
-    if (-not $ReplacementListLoc) {
-        [System.Windows.Forms.MessageBox]::Show("No replacement file selected.", "Error", 'OK', 'Error')
-        exit
-    }
-
-    $replacementLines = Get-Content -Encoding UTF8 -LiteralPath $ReplacementListLoc -ReadCount 0
+    $replacementLines = Read-PlaylistLines -path $ReplacementListLoc
     if ($replacementLines.Count -ne $sourceLines.Count) {
         Write-Error "Source and replacement lists must have the same number of lines."
         exit
     }
 }
+# endregion
 
-# Filter out unwanted lists from the directory listing
+# region: Index Playlists
 $lists = Get-ChildItem -LiteralPath $ListsDir -Filter "*.$ListsExt" | Where-Object {
     -not $unwantedSet.Contains($_.Name)
 }
-$listsTotal = $lists.Count
-$SourceListNumber = -1
 
-# Read content of all lists into a hashtable for faster lookup
 $listsData = @()
 $contentIndex = @{}
+$SourceListNumber = -1
 
-for ($i = 0; $i -lt $listsTotal; $i++) {
-    $filePath = $lists[$i].FullName
-    $fileName = $lists[$i].Name
-    $lines = Get-Content -Encoding UTF8 -LiteralPath $filePath
+for ($i = 0; $i -lt $lists.Count; $i++) {
+    $file = $lists[$i]
+    $lines = Get-Content -Encoding UTF8 -LiteralPath $file.FullName
     $contentSet = [System.Collections.Generic.HashSet[string]]::new()
     foreach ($line in $lines) {
         $contentSet.Add($line) | Out-Null
         if (-not $contentIndex.ContainsKey($line)) {
             $contentIndex[$line] = [System.Collections.Generic.List[string]]::new()
         }
-        $contentIndex[$line].Add($fileName)
+        $contentIndex[$line].Add($file.Name)
     }
     $listsData += [PSCustomObject]@{
-        Index   = $i
-        Name    = $fileName
-        Path    = $filePath
-        Content = $contentSet
+        Index = $i; Name = $file.Name; Path = $file.FullName; Content = $contentSet
     }
-    if ($filePath -eq $SourceListLoc) {
-        $SourceListNumber = $i
-    }
-    Write-Progress -Activity "Building index" -Status "$($i + 1) of $listsTotal" -PercentComplete ((($i + 1) / $listsTotal) * 100)
+    if ($file.FullName -eq $SourceListLoc) { $SourceListNumber = $i }
+    Write-Progress -Activity "Indexing playlists" -Status "$($i + 1)/$($lists.Count)" -PercentComplete (($i + 1) / $lists.Count * 100)
 }
-Write-Progress -Activity "Building index" -Completed
+Write-Progress -Activity "Indexing playlists" -Completed
+if ($SourceListNumber -eq -1) { Write-Error "Source list not indexed."; exit }
+# endregion
 
-if ($SourceListNumber -eq -1) {
-    Write-Error "Source list not found in directory listing."
-    exit
-}
-
+# region: Search & Replace
 $results = @()
-
-# Search using the reverse content index
-# Build a mapping from source line to its index for quick lookup in replace mode
 if ($mode -eq 'replace') {
     $sourceLineToIndex = @{}
-    for ($j = 0; $j -lt $sourceLines.Count; $j++) {
-        $sourceLineToIndex[$sourceLines[$j]] = $j
+    for ($i = 0; $i -lt $sourceLines.Count; $i++) {
+        $sourceLineToIndex[$sourceLines[$i]] = $i
     }
+    $newPlaylistsDir = Create-NewPlaylistsDir -basePath $ListsDir
 }
 
 for ($i = 0; $i -lt $sourceLines.Count; $i++) {
     $line = $sourceLines[$i]
     if ($contentIndex.ContainsKey($line)) {
-        $lineResults = @()
-        foreach ($match in $contentIndex[$line]) {
-            # Exclude the source and replacement lists from being compared
-            if ($match -ne $listsData[$SourceListNumber].Name -and ($mode -ne 'replace' -or $match -ne (Get-Item -LiteralPath $ReplacementListLoc).Name)) {
-                $lineResults += " $match"
+        $hits = $contentIndex[$line] | Where-Object {
+            $_ -ne $listsData[$SourceListNumber].Name -and ($mode -ne 'replace' -or $_ -ne (Get-Item $ReplacementListLoc).Name)
+        }
+        if ($hits.Count -gt 0) {
+            $results += "\n$line"
+            $results += ($hits | ForEach-Object { " $_" })
 
-                # If in replace mode, create output directory for new playlists
-                $newPlaylistsDir = Join-Path $ListsDir "_new-playlists"
-                if (-not (Test-Path -LiteralPath $newPlaylistsDir)) {
-                    New-Item -ItemType Directory -Path $newPlaylistsDir | Out-Null
-                }
-                
-                # If in replace mode, create a new playlist with replaced lines
-                if ($mode -eq 'replace') {
-                    $playlist = $listsData | Where-Object { $_.Name -eq $match }
+            if ($mode -eq 'replace') {
+                foreach ($hit in $hits) {
+                    $playlist = $listsData | Where-Object { $_.Name -eq $hit }
                     if ($playlist) {
-                        $newPlaylistPath = Join-Path $newPlaylistsDir $playlist.Name
-                        $playlistLines = Get-Content -Encoding UTF8 -LiteralPath $playlist.Path
-                        $newContent = @()
-                        foreach ($playlistLine in $playlistLines) {
-                            if ($sourceLineToIndex.ContainsKey($playlistLine)) {
-                                $replaceIdx = $sourceLineToIndex[$playlistLine]
-                                $newContent += $replacementLines[$replaceIdx]
-                            }
-                            else {
-                                $newContent += $playlistLine
+                        $newPath = Join-Path $newPlaylistsDir $playlist.Name
+                        $lines = Get-Content -Encoding UTF8 -LiteralPath $playlist.Path
+                        $updated = $lines | ForEach-Object {
+                            if ($sourceLineToIndex.ContainsKey($_)) {
+                                $replacementLines[$sourceLineToIndex[$_]]
+                            } else {
+                                $_
                             }
                         }
-                        $newContent | Set-Content -Encoding UTF8 -LiteralPath $newPlaylistPath
+                        $updated | Set-Content -Encoding UTF8 -LiteralPath $newPath
                     }
                 }
             }
         }
-        if ($lineResults.Count -gt 0) {
-            $results += "`n$line"
-            $results += $lineResults
-        }
     }
-    Write-Progress -Activity "Searching playlists" -Status "$($i + 1) of $($sourceLines.Count)" -PercentComplete (($i + 1) / $sourceLines.Count * 100)
+    Write-Progress -Activity "Searching playlists" -Status "$($i + 1)/$($sourceLines.Count)" -PercentComplete (($i + 1) / $sourceLines.Count * 100)
 }
 Write-Progress -Activity "Searching playlists" -Completed
+# endregion
 
-# Write report
+# region: Report Output
 if ($results.Count -gt 0) {
     $results | Out-File -Encoding UTF8 -LiteralPath $logReportLoc
 }
 
-# Show logs if they have content
-if ((Test-Path -LiteralPath $logReportLoc) -and ((Get-Item -LiteralPath $logReportLoc).Length -gt 10)) {
+if ((Test-Path $logReportLoc) -and ((Get-Item $logReportLoc).Length -gt 10)) {
     Invoke-Item -LiteralPath $logReportLoc
 }
-if ((Test-Path -LiteralPath $logMissingLoc) -and ((Get-Item -LiteralPath $logMissingLoc).Length -gt 10)) {
+if ((Test-Path $logMissingLoc) -and ((Get-Item $logMissingLoc).Length -gt 10)) {
     Invoke-Item -LiteralPath $logMissingLoc
 }
-
+# endregion
